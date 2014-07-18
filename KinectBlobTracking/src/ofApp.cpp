@@ -25,8 +25,6 @@ void ofApp::setup() {
 		ofLogNotice() << "zero plane dist: " << kinect.getZeroPlaneDistance() << "mm";
 	}
 
-	
-
 	// to setup blob tracking
 	contourFinder.setMinAreaRadius(1);
 	contourFinder.setMaxAreaRadius(1000);
@@ -65,6 +63,11 @@ void ofApp::setup() {
 		balls.push_back(b);
 	}
 
+    cam.setPosition(0, 2000, 2000);
+    
+    ofVec3f eulerAngles(0, -kinect.getAccelPitch()-30, 0);
+    cam.setOrientation(eulerAngles);
+    
 	// open an outgoing connection to HOST:PORT
 	sender.setup(HOST, PORT);
 }
@@ -96,37 +99,19 @@ void ofApp::update() {
 		
 		// load grayscale depth image from the kinect source
 		grayImage.setFromPixels(kinect.getDepthPixels(), kinect.width, kinect.height);
-		
-		// we do two thresholds - one for the far plane and one for the near plane
-		// we then do a cvAnd to get the pixels which are a union of the two thresholds
-		/*if(0) {
-			grayThreshNear = grayImage;
-			grayThreshFar = grayImage;
-			grayThreshNear.threshold(nearThreshold, true);
-			grayThreshFar.threshold(farThreshold);
-			cvAnd(grayThreshNear.getCvImage(), grayThreshFar.getCvImage(), grayImage.getCvImage(), NULL);
-		} else {
-			
-			// or we do it ourselves - show people how they can work with the pixels
-			unsigned char * pix = grayImage.getPixels();
-			
-			int numPixels = grayImage.getWidth() * grayImage.getHeight();
-			for(int i = 0; i < numPixels; i++) {
-				if(pix[i] < nearThreshold && pix[i] > farThreshold) {
-					pix[i] = 255;
-				} else {
-					pix[i] = 0;
-				}
-			}
-		}
-		*/
-		// update the cv images
-		//grayImage.flagImageChanged();
-		
-		// find contours which are between the size of 20 pixels and 1/3 the w*h pixels.
-		// also, find holes is set to true so we will get interior contours as well....
-		//contourFinder.findContours(grayImage, 10, (kinect.width*kinect.height)/2, 20, false);  
-
+        
+//        fbo.begin();
+		cam.begin();
+		drawPointCloud();
+		cam.end();
+//        fbo.end();
+        
+        ofPixels pixels;
+        
+        fbo.readToPixels(pixels);
+        
+        grayImage.setFromPixels(pixels);
+        
 		contourFinder.findContours(grayImage);
 	}  
 }
@@ -211,29 +196,34 @@ void ofApp::draw() {
 	for (int i=0; i < balls.size(); i++){
 		balls[i].draw();
 	}
+    
+    cam.begin();
+    drawPointCloud();
+    cam.end();
 
-	drawBlobs();
+
+//	drawBlobs();
 	
 	ofSetColor(255, 255, 255);
 	
-	if(bDrawPointCloud) {
-		easyCam.begin();
-		drawPointCloud();
-		easyCam.end();
-	} else {
-		// draw from the live kinect
-		ofPushMatrix();
-		ofTranslate(640, 0);
-		kinect.drawDepth(10, 10, 400, 300);
-		kinect.draw(420, 10, 400, 300);		
-		grayImage.draw(10, 320, 400, 300);
-		ofPopMatrix();
-		//contourFinder.draw(10, 320, 400, 300);
-		
-#ifdef USE_TWO_KINECTS
-		kinect2.draw(420, 320, 400, 300);
-#endif
-	}
+//	if(bDrawPointCloud) {
+//		easyCam.begin();
+//		drawPointCloud();
+//		easyCam.end();
+//	} else {
+//		// draw from the live kinect
+//		ofPushMatrix();
+//		ofTranslate(640, 0);
+//		kinect.drawDepth(10, 10, 400, 300);
+//		kinect.draw(420, 10, 400, 300);		
+//		grayImage.draw(10, 320, 400, 300);
+//		ofPopMatrix();
+//		//contourFinder.draw(10, 320, 400, 300);
+//		
+//#ifdef USE_TWO_KINECTS
+//		kinect2.draw(420, 320, 400, 300);
+//#endif
+//	}
 	
 	// draw instructions
 	ofSetColor(255, 255, 255);

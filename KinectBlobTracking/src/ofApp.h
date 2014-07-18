@@ -49,6 +49,8 @@ public:
 	
 	// used for viewing the point cloud
 	ofEasyCam easyCam;
+    ofCamera cam;
+    ofFbo fbo;
 
 	// blob tracking
 	float threshold;
