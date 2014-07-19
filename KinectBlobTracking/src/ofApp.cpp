@@ -49,10 +49,6 @@ void ofApp::setup() {
 	
 	ofSetFrameRate(60);
 	
-	// zero the tilt on startup
-	//angle = 0;
-	//kinect.setCameraTiltAngle(angle);
-	
 	// start from the front
 	bDrawPointCloud = false;
 	
@@ -70,7 +66,6 @@ void ofApp::setup() {
 	// open an outgoing connection to HOST:PORT
 	sender.setup(HOST, PORT);
     
-    worldXRotation = 4;
     worldYPosition = 3400;
     worldZPosition = 1300;
     floor = 0.1;
@@ -222,7 +217,6 @@ void ofApp::draw() {
         
     if(kinect.hasAccelControl()) {
         reportStream <<
-        "worldXRotation: " << worldXRotation <<
         ", worldYPosition: " << worldYPosition <<
         ", worldZPosition: " << worldZPosition <<
         ", floor: " << floor <<
@@ -272,19 +266,8 @@ void ofApp::drawPointCloud() {
 	ofScale(1, -1, -1);
 	ofTranslate(0, 0 + worldYPosition, -1000 + worldZPosition); // center the points a bit
     
-//    ofVec3f eulerAngles(-75, 180, 0);
-    ofRotateX(worldXRotation);
 	ofEnableDepthTest();
 	mesh.drawVertices();
-//    int numVertices = mesh.getNumVertices();
-//
-//    for (ofIndexType i=0; i<numVertices; i++) {
-//        ofVec3f vertex = mesh.getVertex(i);
-//        
-//        if (vertex.z > floor) {
-//            mesh.removeVertex(i);
-//        }
-//    }
 	ofDisableDepthTest();
 	ofPopMatrix();
 }
@@ -373,14 +356,6 @@ void ofApp::keyPressed (int key) {
 			
 		case '0':
 			kinect.setLed(ofxKinect::LED_OFF);
-			break;
-			
-        case OF_KEY_UP:
-            worldXRotation++;
-			break;
-			
-		case OF_KEY_DOWN:
-			worldXRotation--;
 			break;
             
         case OF_KEY_LEFT:

@@ -47,7 +47,6 @@ public:
 	
 	int angle;
     
-    int worldXRotation;
     int worldYPosition;
     int worldZPosition;
     float floor;
