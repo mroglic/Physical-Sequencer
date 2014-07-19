@@ -46,10 +46,14 @@ public:
 	int farThreshold;
 	
 	int angle;
+    
+    int worldXRotation;
+    int worldYPosition;
+    int worldZPosition;
+    float floor;
 	
 	// used for viewing the point cloud
 	ofEasyCam easyCam;
-    ofCamera cam;
     ofFbo fbo;
 
 	// blob tracking

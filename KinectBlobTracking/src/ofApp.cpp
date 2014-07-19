@@ -45,7 +45,7 @@ void ofApp::setup() {
 	grayThreshNear.allocate(kinect.width, kinect.height);
 	grayThreshFar.allocate(kinect.width, kinect.height); 
 
-	kinect.setDepthClipping(500,3000);///nearThreshold, farThreshold);
+	kinect.setDepthClipping(500, 10000);///nearThreshold, farThreshold);
 	
 	ofSetFrameRate(60);
 	
@@ -63,13 +63,17 @@ void ofApp::setup() {
 		balls.push_back(b);
 	}
 
-    cam.setPosition(0, 2000, 2000);
-    
-    ofVec3f eulerAngles(0, -kinect.getAccelPitch()-30, 0);
-    cam.setOrientation(eulerAngles);
+    easyCam.setPosition(0, 0, 1000);
+    ofVec3f orientation(-40, -4.75, -12.5);
+    easyCam.setOrientation(orientation);
     
 	// open an outgoing connection to HOST:PORT
 	sender.setup(HOST, PORT);
+    
+    worldXRotation = 4;
+    worldYPosition = 3400;
+    worldZPosition = 1300;
+    floor = 0.1;
 }
 
 //--------------------------------------------------------------
@@ -100,12 +104,6 @@ void ofApp::update() {
 		// load grayscale depth image from the kinect source
 		grayImage.setFromPixels(kinect.getDepthPixels(), kinect.width, kinect.height);
         
-//        fbo.begin();
-		cam.begin();
-		drawPointCloud();
-		cam.end();
-//        fbo.end();
-        
         ofPixels pixels;
         
         fbo.readToPixels(pixels);
@@ -133,8 +131,6 @@ void ofApp::drawBlobs() {
 			ofCircle(center.x, center.y, 10);
 
 			ofPushMatrix();
-
-
 
 			ofTranslate(center.x, center.y);
 			int label = contourFinder.getLabel(i);
@@ -197,40 +193,41 @@ void ofApp::draw() {
 		balls[i].draw();
 	}
     
-    cam.begin();
-    drawPointCloud();
-    cam.end();
-
-
-//	drawBlobs();
+	drawBlobs();
 	
 	ofSetColor(255, 255, 255);
 	
-//	if(bDrawPointCloud) {
-//		easyCam.begin();
-//		drawPointCloud();
-//		easyCam.end();
-//	} else {
-//		// draw from the live kinect
-//		ofPushMatrix();
-//		ofTranslate(640, 0);
-//		kinect.drawDepth(10, 10, 400, 300);
-//		kinect.draw(420, 10, 400, 300);		
-//		grayImage.draw(10, 320, 400, 300);
-//		ofPopMatrix();
-//		//contourFinder.draw(10, 320, 400, 300);
-//		
-//#ifdef USE_TWO_KINECTS
-//		kinect2.draw(420, 320, 400, 300);
-//#endif
-//	}
+	if(bDrawPointCloud) {
+		easyCam.begin();
+		drawPointCloud();
+		easyCam.end();
+	} else {
+		// draw from the live kinect
+		ofPushMatrix();
+		ofTranslate(640, 0);
+		kinect.drawDepth(10, 10, 400, 300);
+		kinect.draw(420, 10, 400, 300);		
+		grayImage.draw(10, 320, 400, 300);
+		ofPopMatrix();
+		//contourFinder.draw(10, 320, 400, 300);
+		
+#ifdef USE_TWO_KINECTS
+		kinect2.draw(420, 320, 400, 300);
+#endif
+	}
 	
 	// draw instructions
 	ofSetColor(255, 255, 255);
 	stringstream reportStream;
         
     if(kinect.hasAccelControl()) {
-        reportStream << "accel is: " << ofToString(kinect.getMksAccel().x, 2) << " / "
+        reportStream <<
+        "worldXRotation: " << worldXRotation <<
+        ", worldYPosition: " << worldYPosition <<
+        ", worldZPosition: " << worldZPosition <<
+        ", floor: " << floor <<
+        ", easyCam: " << easyCam.getOrientationEuler() <<
+        " | accel is: " << ofToString(kinect.getMksAccel().x, 2) << " / "
         << ofToString(kinect.getMksAccel().y, 2) << " / "
         << ofToString(kinect.getMksAccel().z, 2) << endl;
     } else {
@@ -253,7 +250,6 @@ void ofApp::draw() {
     }
     
 	ofDrawBitmapString(reportStream.str(), 20, 652);
-    
 }
 
 void ofApp::drawPointCloud() {
@@ -274,9 +270,21 @@ void ofApp::drawPointCloud() {
 	ofPushMatrix();
 	// the projected points are 'upside down' and 'backwards' 
 	ofScale(1, -1, -1);
-	ofTranslate(0, 0, -1000); // center the points a bit
+	ofTranslate(0, 0 + worldYPosition, -1000 + worldZPosition); // center the points a bit
+    
+//    ofVec3f eulerAngles(-75, 180, 0);
+    ofRotateX(worldXRotation);
 	ofEnableDepthTest();
 	mesh.drawVertices();
+//    int numVertices = mesh.getNumVertices();
+//
+//    for (ofIndexType i=0; i<numVertices; i++) {
+//        ofVec3f vertex = mesh.getVertex(i);
+//        
+//        if (vertex.z > floor) {
+//            mesh.removeVertex(i);
+//        }
+//    }
 	ofDisableDepthTest();
 	ofPopMatrix();
 }
@@ -325,20 +333,23 @@ void ofApp::keyPressed (int key) {
 			if (nearThreshold < 0) nearThreshold = 0;
 			break;
 			
-		case 'w':
-			kinect.enableDepthNearValueWhite(!kinect.isDepthNearValueWhite());
-			break;
-			/*
-		case 'o':
-			kinect.setCameraTiltAngle(angle); // go back to prev tilt
-			kinect.open();
-			break;
-			
-		case 'c':
-			kinect.setCameraTiltAngle(0); // zero the tilt
-			kinect.close();
-			break;
-			*/
+        case 'w':
+            worldYPosition += 100;
+            break;
+            
+        case 's':
+            worldYPosition -= 100;
+            break;
+            
+        case 'f':
+            floor -= 0.1;
+            easyCam.setNearClip(floor);
+            break;
+            
+        case 'g':
+            floor += 0.1;
+            easyCam.setNearClip(floor);
+            break;
 			
 		case '1':
 			kinect.setLed(ofxKinect::LED_GREEN);
@@ -364,18 +375,21 @@ void ofApp::keyPressed (int key) {
 			kinect.setLed(ofxKinect::LED_OFF);
 			break;
 			
-			/*
-		case OF_KEY_UP:
-			angle++;
-			if(angle>30) angle=30;
-			kinect.setCameraTiltAngle(angle);
+        case OF_KEY_UP:
+            worldXRotation++;
 			break;
 			
 		case OF_KEY_DOWN:
-			angle--;
-			if(angle<-30) angle=-30;
-			kinect.setCameraTiltAngle(angle);
-			break;*/
+			worldXRotation--;
+			break;
+            
+        case OF_KEY_LEFT:
+            worldZPosition -= 100;
+            break;
+            
+        case OF_KEY_RIGHT:
+            worldZPosition += 100;
+            break;
 	}
 }
 
