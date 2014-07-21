@@ -8,14 +8,8 @@ void ofApp::setup() {
 	
 	// enable depth->video image calibration
 	kinect.setRegistration(true);
-    
 	kinect.init();
-	//kinect.init(true); // shows infrared instead of RGB video image
-	//kinect.init(false, false); // disable video image (faster fps)
-	
-	kinect.open();		// opens first available kinect
-	//kinect.open(1);	// open a kinect by id, starting with 0 (sorted by serial # lexicographically))
-	//kinect.open("A00362A08602047A");	// open a kinect using it's unique serial #
+	kinect.open();
 	
 	// print the intrinsic IR sensor values
 	if(kinect.isConnected()) {
@@ -35,17 +29,12 @@ void ofApp::setup() {
 	contourFinder.getTracker().setMaximumDistance(32);	
 	showLabels = true;
 	
-#ifdef USE_TWO_KINECTS
-	kinect2.init();
-	kinect2.open();
-#endif
-	
 	colorImg.allocate(kinect.width, kinect.height);
 	grayImage.allocate(kinect.width, kinect.height);
 	grayThreshNear.allocate(kinect.width, kinect.height);
 	grayThreshFar.allocate(kinect.width, kinect.height); 
 
-	kinect.setDepthClipping(500, 10000);///nearThreshold, farThreshold);
+	kinect.setDepthClipping(500, 10000);
 	
 	ofSetFrameRate(60);
 	
@@ -53,27 +42,25 @@ void ofApp::setup() {
 	bDrawPointCloud = false;
 	
 	// add balls
-	for (int i=0; i < 1; i++){
+	for (int i=0; i < NUM_BALLS; i++){
 		Ball b;	
 		b.setup();
 		balls.push_back(b);
 	}
 
-    easyCam.setPosition(0, 0, 1000);
-    ofVec3f orientation(-40, -4.75, -12.5);
+    easyCam.setPosition(-290, 4500, 390);
+    ofVec3f orientation(-47, -5.7, -4.5);
     easyCam.setOrientation(orientation);
     
 	// open an outgoing connection to HOST:PORT
 	sender.setup(HOST, PORT);
     
-    worldYPosition = 3400;
-    worldZPosition = 1300;
+//    worldYPosition = 3400;
+//    worldZPosition = 1300;
     floor = 0.1;
 }
 
 //--------------------------------------------------------------
-
-
 void ofApp::sendBallPosition(Ball b){
 	ofxOscMessage m;
 	m.setAddress("/position");	 
@@ -83,7 +70,7 @@ void ofApp::sendBallPosition(Ball b){
 }
 
 void ofApp::update() {
-	
+    
 	for (int i=0; i < balls.size(); i++){
 		balls[i].update();
 		sendBallPosition(balls[i]);
@@ -205,10 +192,6 @@ void ofApp::draw() {
 		grayImage.draw(10, 320, 400, 300);
 		ofPopMatrix();
 		//contourFinder.draw(10, 320, 400, 300);
-		
-#ifdef USE_TWO_KINECTS
-		kinect2.draw(420, 320, 400, 300);
-#endif
 	}
 	
 	// draw instructions
@@ -217,30 +200,16 @@ void ofApp::draw() {
         
     if(kinect.hasAccelControl()) {
         reportStream <<
-        ", worldYPosition: " << worldYPosition <<
-        ", worldZPosition: " << worldZPosition <<
-        ", floor: " << floor <<
-        ", easyCam: " << easyCam.getOrientationEuler() <<
-        " | accel is: " << ofToString(kinect.getMksAccel().x, 2) << " / "
+//        ", worldYPosition: " << worldYPosition <<
+//        ", worldZPosition: " << worldZPosition <<
+        "floor: " << floor <<
+        ", virtual cam position: " << easyCam.getPosition() <<
+        ", virtual cam orientation: " << easyCam.getOrientationEuler() <<
+        " | kinect accel: " << ofToString(kinect.getMksAccel().x, 2) << " / "
         << ofToString(kinect.getMksAccel().y, 2) << " / "
         << ofToString(kinect.getMksAccel().z, 2) << endl;
     } else {
-        reportStream << "Note: this is a newer Xbox Kinect or Kinect For Windows device," << endl
-		<< "motor / led / accel controls are not currently supported" << endl << endl;
-    }
-   
-	/*
-	reportStream << "press p to switch between images and point cloud, rotate the point cloud with the mouse" << endl
-	<< "using opencv threshold = " << bThreshWithOpenCV <<" (press spacebar)" << endl
-	<< "set near threshold " << nearThreshold << " (press: + -)" << endl
-	<< "set far threshold " << farThreshold << " (press: < >) num blobs found " << contourFinder.nBlobs
-	<< ", fps: " << ofGetFrameRate() << endl
-	<< "press c to close the connection and o to open it again, connection is: " << kinect.isConnected() << endl;
-	*/
-
-    if(kinect.hasCamTiltControl()) {
-    	reportStream << "press UP and DOWN to change the tilt angle: " << angle << " degrees" << endl
-        << "press 1-5 & 0 to change the led mode" << endl;
+        reportStream << "Kinect probably not plugged in." << endl << endl;
     }
     
 	ofDrawBitmapString(reportStream.str(), 20, 652);
@@ -260,11 +229,11 @@ void ofApp::drawPointCloud() {
 			}
 		}
 	}
-	glPointSize(3);
+	glPointSize(1);
 	ofPushMatrix();
 	// the projected points are 'upside down' and 'backwards' 
 	ofScale(1, -1, -1);
-	ofTranslate(0, 0 + worldYPosition, -1000 + worldZPosition); // center the points a bit
+//	ofTranslate(0, 0 + worldYPosition, -1000 + worldZPosition); // center the points a bit
     
 	ofEnableDepthTest();
 	mesh.drawVertices();
@@ -274,16 +243,13 @@ void ofApp::drawPointCloud() {
 
 //--------------------------------------------------------------
 void ofApp::exit() {
-	//kinect.setCameraTiltAngle(0); // zero the tilt on exit
 	kinect.close();
-	
-#ifdef USE_TWO_KINECTS
-	kinect2.close();
-#endif
 }
 
 //--------------------------------------------------------------
 void ofApp::keyPressed (int key) {
+    ofVec3f position, lookingDirection, upDirection;
+    
 	switch (key) {
 		case ' ':
 			bThreshWithOpenCV = !bThreshWithOpenCV;
@@ -317,11 +283,31 @@ void ofApp::keyPressed (int key) {
 			break;
 			
         case 'w':
-            worldYPosition += 100;
+            position = easyCam.getPosition();
+            lookingDirection = easyCam.getLookAtDir();
+            lookingDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
+            easyCam.setPosition(position + lookingDirection);
             break;
             
         case 's':
-            worldYPosition -= 100;
+            position = easyCam.getPosition();
+            lookingDirection = easyCam.getLookAtDir();
+            lookingDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
+            easyCam.setPosition(position - lookingDirection);
+            break;
+            
+        case 'a':
+            position = easyCam.getPosition();
+            upDirection = easyCam.getUpDir();
+            upDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
+            easyCam.setPosition(position - upDirection);
+            break;
+            
+        case 'd':
+            position = easyCam.getPosition();
+            upDirection = easyCam.getUpDir();
+            upDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
+            easyCam.setPosition(position + upDirection);
             break;
             
         case 'f':
@@ -358,13 +344,13 @@ void ofApp::keyPressed (int key) {
 			kinect.setLed(ofxKinect::LED_OFF);
 			break;
             
-        case OF_KEY_LEFT:
-            worldZPosition -= 100;
-            break;
-            
-        case OF_KEY_RIGHT:
-            worldZPosition += 100;
-            break;
+//        case OF_KEY_LEFT:
+//            worldZPosition -= 100;
+//            break;
+//            
+//        case OF_KEY_RIGHT:
+//            worldZPosition += 100;
+//            break;
 	}
 }
 

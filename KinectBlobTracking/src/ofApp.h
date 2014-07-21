@@ -9,6 +9,8 @@
 
 #define HOST "192.168.101.220"
 #define PORT 12345 
+#define NUM_BALLS 1
+#define VIRTUAL_CAMERA_TRANSLATION_STEP 100
 
 class ofApp : public ofBaseApp {
 public:
@@ -29,15 +31,11 @@ public:
 	
 	ofxKinect kinect;
 	
-#ifdef USE_TWO_KINECTS
-	ofxKinect kinect2;
-#endif
-	
 	ofxCvColorImage colorImg;
 	
-	ofxCvGrayscaleImage grayImage; // grayscale depth image
+	ofxCvGrayscaleImage grayImage;      // grayscale depth image
 	ofxCvGrayscaleImage grayThreshNear; // the near thresholded image
-	ofxCvGrayscaleImage grayThreshFar; // the far thresholded image 	 
+	ofxCvGrayscaleImage grayThreshFar;  // the far thresholded image
 	
 	bool bThreshWithOpenCV;
 	bool bDrawPointCloud;
@@ -47,8 +45,6 @@ public:
 	
 	int angle;
     
-    int worldYPosition;
-    int worldZPosition;
     float floor;
 	
 	// used for viewing the point cloud
@@ -65,5 +61,4 @@ public:
 
 	ofxOscSender sender;
 	void sendBallPosition(Ball b);
- 
 };
