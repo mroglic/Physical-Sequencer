@@ -9,8 +9,10 @@
 
 #define HOST "192.168.101.220"
 #define PORT 12345 
+
 #define NUM_BALLS 1
 #define VIRTUAL_CAMERA_TRANSLATION_STEP 100
+
 
 class ofApp : public ofBaseApp {
 public:
@@ -29,13 +31,13 @@ public:
 	void windowResized(int w, int h);
 	void drawBlobs();
 	
-	ofxKinect kinect;
+	ofxKinect kinect; 
 	
 	ofxCvColorImage colorImg;
 	
-	ofxCvGrayscaleImage grayImage;      // grayscale depth image
+	ofxCvGrayscaleImage grayImage; // grayscale depth image
 	ofxCvGrayscaleImage grayThreshNear; // the near thresholded image
-	ofxCvGrayscaleImage grayThreshFar;  // the far thresholded image
+	ofxCvGrayscaleImage grayThreshFar; // the far thresholded image 	 
 	
 	bool bThreshWithOpenCV;
 	bool bDrawPointCloud;
@@ -44,12 +46,9 @@ public:
 	int farThreshold;
 	
 	int angle;
-    
-    float floor;
 	
 	// used for viewing the point cloud
 	ofEasyCam easyCam;
-    ofFbo fbo;
 
 	// blob tracking
 	float threshold;
@@ -60,5 +59,8 @@ public:
 	std::vector<Ball> balls;
 
 	ofxOscSender sender;
-	void sendBallPosition(Ball b);
+	void sendBallPosition(Ball b); 
+
+	ofFbo fbo; 
+ 
 };
