@@ -7,12 +7,19 @@
 #include "ofxCv.h" 
 #include "ofxOsc.h"
 
+// The IP of the computer playing sound
 #define HOST "192.168.101.220"
-#define PORT 12345 
-
+// The port of the computer playing sound
+#define PORT 12345
+// The number of balls we want in the simulation
 #define NUM_BALLS 1
+// The amount of world units the virtual camera moves by when pressing the 'w', 'a', 's', 'd' keys
 #define VIRTUAL_CAMERA_TRANSLATION_STEP 100
+// Whether to use a mouse controlled camera (easyCam) or a fixed camera
 //#define USE_EASY_CAM 1
+// Clipping planes for the real camera
+#define NEAR_CLIP_REAL_CAMERA 500
+#define FAR_CLIP_REAL_CAMERA 10000
 
 class ofApp : public ofBaseApp {
 public:
@@ -34,29 +41,19 @@ public:
 	void drawBlobs();
 	
 	ofxKinect kinect; 
-	
+	// Color image from the Kinect
 	ofxCvColorImage colorImg;
+    // Grayscale/depth image from the Kinect
+	ofxCvGrayscaleImage grayImage;
 	
-	ofxCvGrayscaleImage grayImage; // grayscale depth image
-	ofxCvGrayscaleImage grayThreshNear; // the near thresholded image
-	ofxCvGrayscaleImage grayThreshFar; // the far thresholded image 	 
-	
-	bool bThreshWithOpenCV;
 	bool bDrawPointCloud;
-	
-	int nearThreshold;
-	int farThreshold;
-	
-	int angle;
 	
 	// used for viewing the point cloud
 	ofEasyCam easyCam;
     ofCamera fixedCam;
-    ofCamera * activeCam;
+    ofCamera * activeCam;       // easyCam or fixedCam
+    bool isVirtualCamInitialAngleSet;
 
-	// blob tracking
-	float threshold;
-	ofVideoPlayer movie;	
 	ofxCv::ContourFinder contourFinder;
 	bool showLabels; 
 
@@ -66,8 +63,6 @@ public:
 	void sendBallPosition(Ball b); 
 
 	ofFbo fboSmall, fboFinal;
- 
-    bool isEasyCamInitialPositionSet;
     
 	ofVboMesh mesh;
     int step;

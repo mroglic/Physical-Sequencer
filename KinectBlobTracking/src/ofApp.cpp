@@ -1,4 +1,5 @@
 #include "ofApp.h"
+
 using namespace ofxCv;
 using namespace cv;
 
@@ -8,17 +9,8 @@ void ofApp::setup() {
 	
 	// enable depth->video image calibration
 	kinect.setRegistration(true);
-    
 	kinect.init(); 
 	kinect.open();		// opens first available kinect 
-
-	// print the intrinsic IR sensor values
-	if(kinect.isConnected()) {
-		ofLogNotice() << "sensor-emitter dist: " << kinect.getSensorEmitterDistance() << "cm";
-		ofLogNotice() << "sensor-camera dist:  " << kinect.getSensorCameraDistance() << "cm";
-		ofLogNotice() << "zero plane pixel size: " << kinect.getZeroPlanePixelSize() << "mm";
-		ofLogNotice() << "zero plane dist: " << kinect.getZeroPlaneDistance() << "mm";
-	} 
 
 	// setup blob tracking
 	contourFinder.setMinAreaRadius(1);
@@ -32,10 +24,8 @@ void ofApp::setup() {
 	
 	colorImg.allocate(kinect.width*0.5, kinect.height*0.5);
 	grayImage.allocate(kinect.width*0.5, kinect.height*0.5);
-	grayThreshNear.allocate(kinect.width, kinect.height);
-	grayThreshFar.allocate(kinect.width, kinect.height); 
 
-	kinect.setDepthClipping(500,10000);///nearThreshold, farThreshold);
+	kinect.setDepthClipping(NEAR_CLIP_REAL_CAMERA, FAR_CLIP_REAL_CAMERA);
 	
 	ofSetFrameRate(60); 
 	
@@ -59,14 +49,9 @@ void ofApp::setup() {
     ofVec3f orientation(0., 0., 0.);
     easyCam.setOrientation(orientation);
     
-    fixedCam.setPosition(750., 3000, 500);
-    ofVec3f fixedCamOrientation(0., -0.20, 0);
-    fixedCam.setOrientation(fixedCamOrientation);
-    
 	// open an outgoing connection to HOST:PORT
 	sender.setup(HOST, PORT); 
 
-    isEasyCamInitialPositionSet = false;
     fboSmall.allocate(320, 240, GL_RGB);
     fboFinal.allocate(640, 480, GL_RGB);
     
@@ -89,7 +74,16 @@ void ofApp::update() {
 		balls[i].update();
 		sendBallPosition(balls[i]);
 	}
-	
+    
+    if (!isVirtualCamInitialAngleSet) {
+        if (kinect.getCurrentCameraTiltAngle() != 0) {
+            activeCam->setPosition(0, 3300, -500);
+            ofVec3f orientation(-90-kinect.getCurrentCameraTiltAngle(), 0, 0);
+            activeCam->setOrientation(orientation);
+            isVirtualCamInitialAngleSet = true;
+        }
+    }
+    
 	ofBackground(100, 100, 100);
 	
 	kinect.update();
@@ -224,23 +218,23 @@ void ofApp::drawBlobs() {
 
 //--------------------------------------------------------------
 void ofApp::draw() {
-//	for (int i=0; i < balls.size(); i++){
-//		balls[i].draw();
-//	}
+	for (int i=0; i < balls.size(); i++){
+		balls[i].draw();
+	}
 
 	ofSetColor(255, 255, 255);
-	
     ofDisableAlphaBlending();
+    
 	if(true) {
         fboFinal.begin();
-        ofClear(0,255);
-        activeCam->begin(ofRectangle(0,0,640,480));
-		drawPointCloud();
-        activeCam->end();
+            ofClear(0,255);
+            activeCam->begin(ofRectangle(0, 0, 640, 480));
+                drawPointCloud();
+            activeCam->end();
         fboFinal.end();
         fboSmall.begin();
-        ofClear(0,255);
-        fboFinal.draw(0, 0, 320, 240);
+            ofClear(0,255);
+            fboFinal.draw(0, 0, 320, 240);
         fboSmall.end();
         fboSmall.draw(0,0);
 	} else {
@@ -253,6 +247,7 @@ void ofApp::draw() {
 		ofPopMatrix();
 		//contourFinder.draw(10, 320, 400, 300);  
 	}
+    
     findContours();
     grayImage.draw(640, 0);
     drawBlobs();
@@ -264,8 +259,9 @@ void ofApp::draw() {
         
     if(kinect.hasAccelControl()) {
         reportStream << 
-		"virtual cam position: " << easyCam.getGlobalPosition() <<
-        ", virtual cam orientation: " << easyCam.getGlobalOrientation() <<
+		"virtual cam position: " << activeCam->getPosition() <<
+        ", virtual cam orientation: " << activeCam->getOrientationEuler() <<
+        " getAccelPitch: " << kinect.getAccelPitch() <<
         " | kinect accel: " << ofToString(kinect.getMksAccel().x, 2) << " / "
         << ofToString(kinect.getMksAccel().y, 2) << " / "
         << ofToString(kinect.getMksAccel().z, 2) << endl;
@@ -306,98 +302,45 @@ void ofApp::keyPressed (int key) {
     ofVec3f position, lookingDirection, upDirection;
     
 	switch (key) {
-		case ' ':
-			bThreshWithOpenCV = !bThreshWithOpenCV;
-			break;
-			
 		case'p':
 			bDrawPointCloud = !bDrawPointCloud;
 			break;
-			
-		case '>':
-		case '.':
-			farThreshold ++;
-			if (farThreshold > 255) farThreshold = 255;
-			break;
-			
-
-		case '<':
-		case ',':
-			farThreshold --;
-			if (farThreshold < 0) farThreshold = 0;
-			break;
-			
-		case '+':
-		case '=':
-			nearThreshold ++;
-			if (nearThreshold > 255) nearThreshold = 255;
-			break;
-			
-		case '-':
-			nearThreshold --;
-			if (nearThreshold < 0) nearThreshold = 0;
-			break;
-			
+						
         case 'w':
-            position = easyCam.getPosition();
-            lookingDirection = easyCam.getLookAtDir();
+            position = activeCam->getPosition();
+            lookingDirection = activeCam->getLookAtDir();
             lookingDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
-            easyCam.setPosition(position + lookingDirection);
+            activeCam->setPosition(position + lookingDirection);
             break;
             
         case 's':
-            position = easyCam.getPosition();
-            lookingDirection = easyCam.getLookAtDir();
+            position = activeCam->getPosition();
+            lookingDirection = activeCam->getLookAtDir();
             lookingDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
-            easyCam.setPosition(position - lookingDirection);
+            activeCam->setPosition(position - lookingDirection);
             break;
             
         case 'a':
-            position = easyCam.getPosition();
-            upDirection = easyCam.getUpDir();
+            position = activeCam->getPosition();
+            upDirection = activeCam->getUpDir();
             upDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
-            easyCam.setPosition(position - upDirection);
+            activeCam->setPosition(position - upDirection);
             break;
             
         case 'd':
-            position = easyCam.getPosition();
-            upDirection = easyCam.getUpDir();
+            position = activeCam->getPosition();
+            upDirection = activeCam->getUpDir();
             upDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
-            easyCam.setPosition(position + upDirection);
+            activeCam->setPosition(position + upDirection);
             break;
 			
-		case '1':
-			kinect.setLed(ofxKinect::LED_GREEN);
+		case OF_KEY_UP:
+            activeCam->rotate(1, activeCam->getSideDir());
 			break;
 			
-		case '2':
-			kinect.setLed(ofxKinect::LED_YELLOW);
+		case OF_KEY_DOWN:
+            activeCam->rotate(-1, activeCam->getSideDir());
 			break;
-			
-		case '3':
-			kinect.setLed(ofxKinect::LED_RED);
-			break;
-			
-		case '4':
-			kinect.setLed(ofxKinect::LED_BLINK_GREEN);
-			break;
-			
-		case '5':
-			kinect.setLed(ofxKinect::LED_BLINK_YELLOW_RED);
-			break;
-			
-		case '0':
-			kinect.setLed(ofxKinect::LED_OFF);
-			break;
-            
-//        case OF_KEY_LEFT:
-//            worldZPosition -= 100;
-//            break;
-//            
-//        case OF_KEY_RIGHT:
-//            worldZPosition += 100;
-//            break;
-
 	}
 }
 
