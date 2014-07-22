@@ -39,16 +39,6 @@ void ofApp::setup() {
 		balls.push_back(b);
 	}
     
-#ifdef USE_EASY_CAM
-    activeCam = &easyCam;
-#else
-    activeCam = &fixedCam;
-#endif
-
-    easyCam.setPosition(0., 0., 0.);
-    ofVec3f orientation(0., 0., 0.);
-    easyCam.setOrientation(orientation);
-    
 	// open an outgoing connection to HOST:PORT
 	sender.setup(HOST, PORT); 
 
@@ -77,9 +67,9 @@ void ofApp::update() {
     
     if (!isVirtualCamInitialAngleSet) {
         if (kinect.getCurrentCameraTiltAngle() != 0) {
-            activeCam->setPosition(0, 3300, -500);
+            virtualCam.setPosition(0, 3300, -500);
             ofVec3f orientation(-90-kinect.getCurrentCameraTiltAngle(), 0, 0);
-            activeCam->setOrientation(orientation);
+            virtualCam.setOrientation(orientation);
             isVirtualCamInitialAngleSet = true;
         }
     }
@@ -228,9 +218,9 @@ void ofApp::draw() {
 	if(true) {
         fboFinal.begin();
             ofClear(0,255);
-            activeCam->begin(ofRectangle(0, 0, 640, 480));
+            virtualCam.begin(ofRectangle(0, 0, 640, 480));
                 drawPointCloud();
-            activeCam->end();
+            virtualCam.end();
         fboFinal.end();
         fboSmall.begin();
             ofClear(0,255);
@@ -259,8 +249,8 @@ void ofApp::draw() {
         
     if(kinect.hasAccelControl()) {
         reportStream << 
-		"virtual cam position: " << activeCam->getPosition() <<
-        ", virtual cam orientation: " << activeCam->getOrientationEuler() <<
+		"virtual cam position: " << virtualCam.getPosition() <<
+        ", virtual cam orientation: " << virtualCam.getOrientationEuler() <<
         " getAccelPitch: " << kinect.getAccelPitch() <<
         " | kinect accel: " << ofToString(kinect.getMksAccel().x, 2) << " / "
         << ofToString(kinect.getMksAccel().y, 2) << " / "
@@ -307,39 +297,39 @@ void ofApp::keyPressed (int key) {
 			break;
 						
         case 'w':
-            position = activeCam->getPosition();
-            lookingDirection = activeCam->getLookAtDir();
+            position = virtualCam.getPosition();
+            lookingDirection = virtualCam.getLookAtDir();
             lookingDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
-            activeCam->setPosition(position + lookingDirection);
+            virtualCam.setPosition(position + lookingDirection);
             break;
             
         case 's':
-            position = activeCam->getPosition();
-            lookingDirection = activeCam->getLookAtDir();
+            position = virtualCam.getPosition();
+            lookingDirection = virtualCam.getLookAtDir();
             lookingDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
-            activeCam->setPosition(position - lookingDirection);
+            virtualCam.setPosition(position - lookingDirection);
             break;
             
         case 'a':
-            position = activeCam->getPosition();
-            upDirection = activeCam->getUpDir();
+            position = virtualCam.getPosition();
+            upDirection = virtualCam.getUpDir();
             upDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
-            activeCam->setPosition(position - upDirection);
+            virtualCam.setPosition(position - upDirection);
             break;
             
         case 'd':
-            position = activeCam->getPosition();
-            upDirection = activeCam->getUpDir();
+            position = virtualCam.getPosition();
+            upDirection = virtualCam.getUpDir();
             upDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
-            activeCam->setPosition(position + upDirection);
+            virtualCam.setPosition(position + upDirection);
             break;
 			
 		case OF_KEY_UP:
-            activeCam->rotate(1, activeCam->getSideDir());
+            virtualCam.rotate(1, virtualCam.getSideDir());
 			break;
 			
 		case OF_KEY_DOWN:
-            activeCam->rotate(-1, activeCam->getSideDir());
+            virtualCam.rotate(-1, virtualCam.getSideDir());
 			break;
 	}
 }

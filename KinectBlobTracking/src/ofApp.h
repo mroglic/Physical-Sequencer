@@ -48,10 +48,7 @@ public:
 	
 	bool bDrawPointCloud;
 	
-	// used for viewing the point cloud
-	ofEasyCam easyCam;
-    ofCamera fixedCam;
-    ofCamera * activeCam;       // easyCam or fixedCam
+    ofCamera virtualCam;
     bool isVirtualCamInitialAngleSet;
 
 	ofxCv::ContourFinder contourFinder;
