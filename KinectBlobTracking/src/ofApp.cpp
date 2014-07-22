@@ -47,23 +47,28 @@ void ofApp::setup() {
     
 	step = 2;
     mesh.getVertices().resize(640/step*480/step);
+	isVirtualCamInitialAngleSet = false;
+
+	sendingOSC = true;
 }
 
 //--------------------------------------------------------------
-void ofApp::sendBallPosition(Ball b){
-	ofxOscMessage m;
-	m.setAddress("/position");	 
-	m.addFloatArg(b.x);
-	m.addFloatArg(b.y);
-	sender.sendMessage(m);
+void ofApp::sendBlobsPositions(){
+	for(int i = 0; i < contourFinder.size(); i++) {
+		ofxOscMessage m;
+		m.setAddress("/blobs");
+		// send id, x and y of blobs
+		ofPoint center = toOf(contourFinder.getCenter(i));		
+		m.addIntArg(contourFinder.getLabel(i));
+		m.addFloatArg(center.x);
+		m.addFloatArg(center.y);
+		sender.sendMessage(m);
+	}
 }
 
 void ofApp::update() {
 	// send osc meesage
-	for (int i=0; i < balls.size(); i++){
-		balls[i].update();
-		sendBallPosition(balls[i]);
-	}
+	if (sendingOSC)	sendBlobsPositions();	
     
     if (!isVirtualCamInitialAngleSet) {
         if (kinect.getCurrentCameraTiltAngle() != 0) {

@@ -19,8 +19,7 @@
 //#define USE_EASY_CAM 1
 // Clipping planes for the real camera
 #define NEAR_CLIP_REAL_CAMERA 500
-#define FAR_CLIP_REAL_CAMERA 10000
-
+#define FAR_CLIP_REAL_CAMERA 10
 class ofApp : public ofBaseApp {
 public:
 	
@@ -54,13 +53,14 @@ public:
 	ofxCv::ContourFinder contourFinder;
 	bool showLabels; 
 
-	std::vector<Ball> balls;
-
-	ofxOscSender sender;
-	void sendBallPosition(Ball b); 
+	std::vector<Ball> balls;	  
 
 	ofFbo fboSmall, fboFinal;
     
 	ofVboMesh mesh;
     int step;
+
+	ofxOscSender sender;
+	bool sendingOSC;
+	void sendBlobsPositions();
 };
