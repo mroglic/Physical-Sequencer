@@ -30,8 +30,8 @@ void ofApp::setup() {
 	contourFinder.getTracker().setMaximumDistance(32);	
 	showLabels = true; 
 	
-	colorImg.allocate(kinect.width, kinect.height);
-	grayImage.allocate(kinect.width, kinect.height);
+	colorImg.allocate(kinect.width*0.5, kinect.height*0.5);
+	grayImage.allocate(kinect.width*0.5, kinect.height*0.5);
 	grayThreshNear.allocate(kinect.width, kinect.height);
 	grayThreshFar.allocate(kinect.width, kinect.height); 
 
@@ -48,21 +48,33 @@ void ofApp::setup() {
 		b.setup();
 		balls.push_back(b);
 	}
-
-    easyCam.setGlobalPosition(555, 4822.5, 94.5);
     
-	ofVec3f orientation(-55.8, -4.1, -1.2);
-	ofQuaternion qOrientation = ofQuaternion(orientation);
-    easyCam.setGlobalOrientation(orientation);
+#ifdef USE_EASY_CAM
+    activeCam = &easyCam;
+#else
+    activeCam = &fixedCam;
+#endif
+
+    easyCam.setPosition(0., 0., 0.);
+    ofVec3f orientation(0., 0., 0.);
+    easyCam.setOrientation(orientation);
+    
+    fixedCam.setPosition(750., 3000, 500);
+    ofVec3f fixedCamOrientation(0., -0.20, 0);
+    fixedCam.setOrientation(fixedCamOrientation);
     
 	// open an outgoing connection to HOST:PORT
 	sender.setup(HOST, PORT); 
 
+    isEasyCamInitialPositionSet = false;
+    fboSmall.allocate(320, 240, GL_RGB);
+    fboFinal.allocate(640, 480, GL_RGB);
+    
+	step = 2;
+    mesh.getVertices().resize(640/step*480/step);
 }
 
 //--------------------------------------------------------------
-
-
 void ofApp::sendBallPosition(Ball b){
 	ofxOscMessage m;
 	m.setAddress("/position");	 
@@ -81,20 +93,23 @@ void ofApp::update() {
 	ofBackground(100, 100, 100);
 	
 	kinect.update();
-	
+}
+
+void ofApp::findContours() {
 	// there is a new frame and we are connected
-	if(kinect.isFrameNew()) {		
-		// load grayscale depth image from the kinect source
-		grayImage.setFromPixels(kinect.getDepthPixels(), kinect.width, kinect.height);
-
-		ofPixels pixels;
+	if(kinect.isFrameNewDepth()) {
+        if (true) {
+            ofPixels pixels;
+            fboSmall.readToPixels(pixels);
+            colorImg.setFromPixels(pixels);
+            grayImage = colorImg;
+        } else {
+            // load grayscale depth image from the kinect source
+            grayImage.setFromPixels(kinect.getDepthPixels(), kinect.width, kinect.height);
+        }
         
-        fbo.readToPixels(pixels);
-        
-        grayImage.setFromPixels(pixels);
-
 		contourFinder.findContours(grayImage);
-	}  
+	}
 }
 
 void ofApp::drawBlobs() { 
@@ -132,13 +147,13 @@ void ofApp::drawBlobs() {
         //WHY ARE THEY FILLING SO CHAOTICALLY?
         ofColor pathColor(255,255,0);
         pathFromContour.setFillColor(pathColor);
-        pathFromContour.draw();
+//        pathFromContour.draw();
 
 
 		ofFill();
 		ofSetColor(255,255,0);
-		pl.draw(); 
-	}  
+//		pl.draw(); 
+	}
 
 	if(showLabels) {
 		ofSetColor(255);
@@ -209,18 +224,25 @@ void ofApp::drawBlobs() {
 
 //--------------------------------------------------------------
 void ofApp::draw() {
-	for (int i=0; i < balls.size(); i++){
-		balls[i].draw();
-	}
+//	for (int i=0; i < balls.size(); i++){
+//		balls[i].draw();
+//	}
 
-	drawBlobs();
-	
 	ofSetColor(255, 255, 255);
 	
-	if(bDrawPointCloud) {
-		easyCam.begin();
+    ofDisableAlphaBlending();
+	if(true) {
+        fboFinal.begin();
+        ofClear(0,255);
+        activeCam->begin(ofRectangle(0,0,640,480));
 		drawPointCloud();
-		easyCam.end();
+        activeCam->end();
+        fboFinal.end();
+        fboSmall.begin();
+        ofClear(0,255);
+        fboFinal.draw(0, 0, 320, 240);
+        fboSmall.end();
+        fboSmall.draw(0,0);
 	} else {
 		// draw from the live kinect
 		ofPushMatrix();
@@ -231,6 +253,10 @@ void ofApp::draw() {
 		ofPopMatrix();
 		//contourFinder.draw(10, 320, 400, 300);  
 	}
+    findContours();
+    grayImage.draw(640, 0);
+    drawBlobs();
+    ofEnableAlphaBlending();
 	
 	// draw instructions
 	ofSetColor(255, 255, 255);
@@ -247,21 +273,17 @@ void ofApp::draw() {
         reportStream << "Kinect probably not plugged in." << endl << endl;
     }  
     
-	ofDrawBitmapString(reportStream.str(), 20, 652);    
+	ofDrawBitmapString(reportStream.str(), 20, 652);
+    ofDrawBitmapString(ofToString(ofGetFrameRate()),20,20);
 }
 
 void ofApp::drawPointCloud() {
 	int w = 640;
 	int h = 480;
-	ofMesh mesh;
 	mesh.setMode(OF_PRIMITIVE_POINTS);
-	int step = 2;
-	for(int y = 0; y < h; y += step) {
-		for(int x = 0; x < w; x += step) {
-			if(kinect.getDistanceAt(x, y) > 0) {
-				mesh.addColor(kinect.getColorAt(x,y));
-				mesh.addVertex(kinect.getWorldCoordinateAt(x, y));
-			}
+	for(int y = 0, i = 0; y < h; y += step) {
+		for(int x = 0; x < w; x += step, i++) {
+            mesh.getVertices()[i] = kinect.getWorldCoordinateAt(x, y);
 		}
 	}
 	glPointSize(3);
@@ -342,8 +364,7 @@ void ofApp::keyPressed (int key) {
             upDirection = easyCam.getUpDir();
             upDirection *= VIRTUAL_CAMERA_TRANSLATION_STEP;
             easyCam.setPosition(position + upDirection);
-            break; 
-        
+            break;
 			
 		case '1':
 			kinect.setLed(ofxKinect::LED_GREEN);

@@ -12,7 +12,7 @@
 
 #define NUM_BALLS 1
 #define VIRTUAL_CAMERA_TRANSLATION_STEP 100
-
+//#define USE_EASY_CAM 1
 
 class ofApp : public ofBaseApp {
 public:
@@ -29,6 +29,8 @@ public:
 	void mousePressed(int x, int y, int button);
 	void mouseReleased(int x, int y, int button);
 	void windowResized(int w, int h);
+    
+    void findContours();
 	void drawBlobs();
 	
 	ofxKinect kinect; 
@@ -49,6 +51,8 @@ public:
 	
 	// used for viewing the point cloud
 	ofEasyCam easyCam;
+    ofCamera fixedCam;
+    ofCamera * activeCam;
 
 	// blob tracking
 	float threshold;
@@ -61,6 +65,10 @@ public:
 	ofxOscSender sender;
 	void sendBallPosition(Ball b); 
 
-	ofFbo fbo; 
+	ofFbo fboSmall, fboFinal;
  
+    bool isEasyCamInitialPositionSet;
+    
+	ofVboMesh mesh;
+    int step;
 };
