@@ -2,7 +2,6 @@
 #include "ofMain.h"
 
 class Ball
-
 {
 public:
 	void setup();

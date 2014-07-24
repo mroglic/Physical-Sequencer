@@ -9,8 +9,7 @@ void Ball::setup(){
 	velocity.y = ofRandom(1,10);	
 }   
 
-void Ball::update(){
-	printf("update %d %d",x,y);
+void Ball::update(){	
 	x += velocity.x;
 	y += velocity.y;
 
@@ -28,6 +27,3 @@ void Ball::draw(){
 	ofFill();
 	ofCircle(x, y, r);
 }
-
-
- 
