@@ -4,7 +4,6 @@ using namespace ofxCv;
 using namespace cv;
 
 void ofApp::setup() {
-	ofSetLogLevel(OF_LOG_VERBOSE);
 	ofSetFrameRate(60);
 
 	if (KINECT_ON){
@@ -12,12 +11,13 @@ void ofApp::setup() {
 		// enable depth->video image calibration
 		kinect.setRegistration(true);
 		kinect.init(); 
+		
 		kinect.open();		// opens first available kinect 
 
 		// setup blob tracking
-		contourFinder.setMinAreaRadius(1);
-		contourFinder.setMaxAreaRadius(1000);
-		contourFinder.setThreshold(15);
+		contourFinder.setMinAreaRadius(6);
+		contourFinder.setMaxAreaRadius(300);
+		contourFinder.setThreshold(11);
 
 		// wait for half a frame before forgetting something
 		contourFinder.getTracker().setPersistence(15);
@@ -40,6 +40,11 @@ void ofApp::setup() {
 		step = 2;
 		mesh.getVertices().resize(640/step*480/step);
 		isVirtualCamInitialAngleSet = false;
+		blobcolor[0].set(255,0,255);
+		blobcolor[1].set(ofColor::aquamarine);
+		blobcolor[2].setHex(0xFF8000, 128);
+		blobcolor[3].set(0,0,255);
+		blobcolor[4].set(255,0,255); 
 	}
 
 	// open an outgoing connection to HOST:PORT
@@ -47,6 +52,7 @@ void ofApp::setup() {
 		
 	createBalls();
 	createPlanktons();
+	
 }
 
 /********************************** BALLS **********************************/
@@ -101,19 +107,36 @@ void ofApp::drawPlanktons(){
 /********************************** OSC **********************************/
 void ofApp::sendBlobsPositions(){
 	if (SEND_OSC){
-		for(int i = 0; i < contourFinder.size(); i++) {
+		for(int i = 0; i < blobs.size(); i++) {
 			ofxOscMessage m;
-			m.setAddress("/blobs");
+			m.setAddress("/blobs/" + ofToString(i));
 			// send id, x and y of blobs
-			ofPoint center = toOf(contourFinder.getCenter(i));	
-			m.addIntArg(contourFinder.getLabel(i));
-			m.addFloatArg(center.x);
-			m.addFloatArg(center.y);
-			m.addFloatArg(contourFinder.getContourArea(i));
+			m.addIntArg(blobs[i].id);
+			m.addFloatArg(blobs[i].x);
+			m.addFloatArg(blobs[i].y);
+			m.addFloatArg(blobs[i].r); 
 			sender.sendMessage(m);
-		}
+		}  
 	}
 } 
+
+void ofApp::sendEntered(int label){
+	if (SEND_OSC){
+		ofxOscMessage m;
+		m.setAddress("/entered");		
+		m.addIntArg(label);		
+		sender.sendMessage(m);
+	}
+}
+
+void ofApp::sendExited(int label){
+	if (SEND_OSC){
+		ofxOscMessage m;
+		m.setAddress("/exited");		
+		m.addIntArg(label);		 
+		sender.sendMessage(m);
+	}
+}
 
 void ofApp::sendCollision(int type){
 	if (SEND_OSC){
@@ -138,21 +161,35 @@ void ofApp::update() {
 			}
 		}
 
-		kinect.update();	
+		kinect.update();
+
+		//  get blobs
+		if (kinect.isFrameNewDepth()) findContours();  
+		
+		// update blobs
+		updateBlobs();
+
+		// send blob positions
+		sendBlobsPositions();
 	}
-
-	updateBalls();
+	else{
+		updateBalls();
+	}
+	
 	updatePlanktons();
-
-	sendBlobsPositions();
+	
+	if (KINECT_ON) checkCollisionAndUpdate();
+	else checkCollisionAndUpdateWithBalls();
+	
 } 
 
+/********************************** COLLISION **********************************/
 void ofApp::checkCollisionAndUpdate(){
 	for(int i = 0; i < contourFinder.size(); i++) {
 		ofPoint center = toOf(contourFinder.getCenter(i));
 
 		for(int j = 0; j < planktons.size(); j += 1) {			
-			ofPoint c1(center.x, center.y);
+			ofPoint c1(center.x * 4, center.y * 4);
 			ofPoint c2(planktons[j].x, planktons[j].y);
 					
 			// delete plankton after hited and animation
@@ -201,6 +238,69 @@ void ofApp::checkCollisionAndUpdateWithBalls(){
 	}
 }
 
+/********************************** BLOBS **********************************/
+
+void ofApp::updateBlobs() {
+	if (contourFinder.size() == 0){
+		// make new array of blobs
+		std::vector<Blob> blobs;
+		return;
+	} 
+			
+	// check new blobs
+	for(int i = 0; i < contourFinder.size(); i++){
+		unsigned int blobId = contourFinder.getLabel(i);
+		
+		ofPoint center = toOf(contourFinder.getCenter(i));
+		float x = center.x * 4;
+		float y = center.y * 4;
+		
+		float r = contourFinder.getContourArea(i) / 20;
+
+		// is new blob
+		bool isNewBlob = true;
+		for(int j = 0; j < blobs.size(); j++){						
+			if (blobs[j].id == blobId) {
+				isNewBlob = false;				
+				blobs[j].update(x, y, r);
+				break;
+			}
+		}
+
+		// add new blob
+		if (isNewBlob){
+			Blob b;
+			b.setup(blobId, x, y);
+			b.update(x, y, r);
+			blobs.push_back(b);
+			sendEntered(i);
+			printf("NEW BLOB ADDED \n");
+		}	
+	}				
+
+	// check ofscreen blobs
+	for(int j = blobs.size()-1; j >= 0; j--){
+		// is ofscreen blob
+		bool isOffscreenBlob = true;
+		for(int i = 0; i < contourFinder.size(); i++){
+			unsigned int blobId = contourFinder.getLabel(i);
+			if (blobs[j].id == blobId) {
+				isOffscreenBlob = false;
+				break;					
+			}
+		}
+
+		// remove offscreen blob
+		if (isOffscreenBlob){
+			blobs.pop_back();
+			sendExited(j);
+			printf("REMOVED BLOB \n");
+		} 
+	}
+
+	//printf("BLOB SIZE %d \n", blobs.size());
+}
+
 void ofApp::findContours() {
 	// there is a new frame and we are connected	 
     if (true) {
@@ -211,9 +311,18 @@ void ofApp::findContours() {
     } else {
         // load grayscale depth image from the kinect source
         grayImage.setFromPixels(kinect.getDepthPixels(), kinect.width, kinect.height);
-    }
-        
+    }	
+       
+	// get blobs
 	contourFinder.findContours(grayImage);
+
+	
+}
+
+void ofApp::drawBlobs2() {	
+	for (int i = 0; i < blobs.size(); i++){
+		blobs[i].draw();
+	}
 }
 
 void ofApp::drawBlobs() {
@@ -229,6 +338,9 @@ void ofApp::drawBlobs() {
 
 			ofSetColor(255,0,0);
 			ofFill();
+
+			center.x *= 4;
+			center.y *= 4;
 			ofCircle(center.x, center.y, 30);
 
 			ofPushMatrix(); 
@@ -287,8 +399,10 @@ void ofApp::drawBlobs() {
 	}
 }
 
+/********************************** DRAW **********************************/
+
 void ofApp::draw() {
-	ofBackground(100, 100, 100);
+	ofBackground(0);
 	ofSetColor(255, 255, 255);
     ofDisableAlphaBlending();
     
@@ -307,6 +421,38 @@ void ofApp::draw() {
 			fboSmall.end();
 
 			fboSmall.draw(0,0);
+
+			for(unsigned int j = 0; j < contourFinder.size(); j++){
+				//contourFinder.setSimplify(true);
+				rectcontour = contourFinder.getFitEllipse(j);
+				cv::Point2f rc=rectcontour.center;
+				cv::Size2f rs=rectcontour.size;
+				float rangle=rectcontour.angle;
+				ofPushMatrix();
+				ofTranslate(rc.x*4,rc.y*4);
+				ofRotate(rangle);
+			
+				for(float theta = 0; theta < TWO_PI; theta += 0.1){
+					ofPath p;//,p1;
+					ofColor stupidcolor(255,255,255);
+					p.setColor(blobcolor[j]);
+					float ww1 = ofRandom(20);
+					float wigglywidth=rs.width*0.75*cos(theta);
+					float wigglyheight=rs.height*0.75*sin(theta);
+					p.circle(wigglywidth+ww1,wigglyheight+ww1,1);
+					p.setFilled(true);
+					p.setCircleResolution(100);
+
+					ofEnableAlphaBlending();
+					ofNoFill();
+					ofSetColor(255,0,0,128);    
+					ofEllipse(0,0,wigglywidth+ww1,wigglyheight+ww1);
+					ofNoFill();
+					ofDisableAlphaBlending();
+					p.draw(0,0);
+				}
+				ofPopMatrix();	
+			}
 		} else {
 			// draw from the live kinect
 			ofPushMatrix();
@@ -316,12 +462,9 @@ void ofApp::draw() {
 			grayImage.draw(10, 320, 400, 300);
 			ofPopMatrix();
 			//contourFinder.draw(10, 320, 400, 300);  
-		}
-    
-		if (kinect.isFrameNewDepth()) findContours();
-		//grayImage.draw(640, 0);
-    
-		//ofEnableAlphaBlending();
+		} 
+		
+		//grayImage.draw(640, 0); 
 	
 		// draw instructions
 		ofSetColor(255, 255, 255);
@@ -345,7 +488,7 @@ void ofApp::draw() {
 
 	drawPlanktons();
 
-	if (KINECT_ON) drawBlobs();
+	if (KINECT_ON) drawBlobs2();
 	else drawBalls();
 }
 

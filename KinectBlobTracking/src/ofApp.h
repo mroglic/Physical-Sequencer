@@ -1,15 +1,16 @@
 #pragma once
 
+#include "Blob.h" 
 #include "Plankton.h"
 #include "Ball.h"
 #include "ofMain.h"
 #include "ofxOpenCv.h"
 #include "ofxKinect.h"
 #include "ofxCv.h" 
-#include "ofxOsc.h"
+#include "ofxOsc.h" 
 
 // Sending OSC messages or not
-#define SEND_OSC false
+#define SEND_OSC true
 
 // The IP and port of the computer playing sound
 #define HOST "192.168.101.220"
@@ -17,7 +18,8 @@
 
 // The number of balls we want in the simulation
 #define NUM_BALLS 10
-#define NUM_PLANKTONS 30
+#define NUM_PLANKTONS 150
+#define MAX_NUM_BLOBS 3
 
 // The amount of world units the virtual camera moves by when pressing the 'w', 'a', 's', 'd' keys
 #define VIRTUAL_CAMERA_TRANSLATION_STEP 100
@@ -26,8 +28,8 @@
 //#define USE_EASY_CAM 1
 
 // Clipping planes for the real camera
-#define NEAR_CLIP_REAL_CAMERA 500
-#define FAR_CLIP_REAL_CAMERA 10
+#define NEAR_CLIP_REAL_CAMERA 550
+#define FAR_CLIP_REAL_CAMERA 5
 
 #define KINECT_ON true
 
@@ -45,10 +47,7 @@ public:
 	void mouseDragged(int x, int y, int button);
 	void mousePressed(int x, int y, int button);
 	void mouseReleased(int x, int y, int button);
-	void windowResized(int w, int h);
-    
-    void findContours();
-	void drawBlobs();
+	void windowResized(int w, int h);  
 	
 	ofxKinect kinect; 
 	// Color image from the Kinect
@@ -62,31 +61,47 @@ public:
     bool isVirtualCamInitialAngleSet;
 
 	ofxCv::ContourFinder contourFinder;
-	bool showLabels; 
-
-	void createBalls();
-	void drawBalls();
-	void updateBalls();
-	std::vector<Ball> balls;
+	bool showLabels;   
 
 	ofFbo fboSmall, fboFinal;
     
 	ofVboMesh mesh;
     int step;
 
+	// BALLS
+	void createBalls();
+	void drawBalls();
+	void updateBalls();
+	std::vector<Ball> balls;
+
+	// OSC
 	ofxOscSender sender;
 	void sendBlobsPositions();
 	void sendCollision(int type);
+	void sendEntered(int label);
+	void sendExited(int label);
 
+	// PLANKTON
+	std::vector<Plankton> planktons;
 	void createNewPlankton();
 	void createPlanktons();
 	void updatePlanktons();
 	void drawPlanktons();
-
-	std::vector<Plankton> planktons;
-
-	void checkCollisionAndUpdate();
-	void checkCollisionAndUpdateWithBalls();
 	
-	bool isColliding(ofPoint c1, float r1, ofPoint c2, float r2);
+	// BLOBS
+	std::vector<int> labels;
+	std::vector<Blob> blobs; 
+	void findContours();
+	void updateBlobs();
+	void drawBlobs();
+	void drawBlobs2();
+
+	// COLLISION
+	void checkCollisionAndUpdate();
+	void checkCollisionAndUpdateWithBalls();	
+	bool isColliding(ofPoint c1, float r1, ofPoint c2, float r2);	
+
+	cv::RotatedRect rectcontour;
+
+	ofColor blobcolor[5];
 };
